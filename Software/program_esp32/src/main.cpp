@@ -19,7 +19,7 @@ LiquidCrystal_I2C lcd(0x3F, 16, 2);  // set the LCD address to 0x3F for a 16 cha
 BluetoothSerial SerialBT;
 
 
-char btdata = NULL;  //Assign data which receive from bluetooth
+char btdata = '\0';  //Assign data which receive from bluetooth
 
 const int pwmPin1 = 12;  // PWM output pin for GPIO 12
 const int pwmPin2 = 13;  // PWM output pin for GPIO 13
@@ -130,6 +130,37 @@ void setPWM() {
   analogWrite(pwmPin2, dutyCycle2);
 }
 
+//............................Save duty cycle to EEPROM.............//
+void saveDutyCycleA() {
+  EEPROM.put(eepromAddressDutyCycleA1, dutyCycleA1);
+  EEPROM.put(eepromAddressDutyCycleA2, dutyCycleA2);
+  EEPROM.commit();  // Store the values in EEPROM
+  delay(10);
+}
+void saveDutyCycleB() {
+  EEPROM.put(eepromAddressDutyCycleB1, dutyCycleB1);
+  EEPROM.put(eepromAddressDutyCycleB2, dutyCycleB2);
+  EEPROM.commit();  // Store the values in EEPROM
+  delay(10);
+}
+void saveDutyCycleC() {
+  EEPROM.put(eepromAddressDutyCycleC1, dutyCycleC1);
+  EEPROM.put(eepromAddressDutyCycleC2, dutyCycleC2);
+  EEPROM.commit();  // Store the values in EEPROM
+  delay(10);
+}
+void saveDutyCycleD() {
+  EEPROM.put(eepromAddressDutyCycleD1, dutyCycleD1);
+  EEPROM.put(eepromAddressDutyCycleD2, dutyCycleD2);
+  EEPROM.commit();  // Store the values in EEPROM
+  delay(10);
+}
+void saveDutyCycleE() {
+  EEPROM.put(eepromAddressDutyCycleE1, dutyCycleE1);
+  EEPROM.put(eepromAddressDutyCycleE2, dutyCycleE2);
+  EEPROM.commit();  // Store the values in EEPROM
+  delay(10);
+}
 //.............................Display data to LCD.................//
 void displayData() {
   if (motor1 != dutyCycle1 || motor2 != dutyCycle2) {
@@ -514,37 +545,6 @@ void adjustDutyCycleE() {
 }
 
 
-void saveDutyCycleA() {
-  EEPROM.put(eepromAddressDutyCycleA1, dutyCycleA1);
-  EEPROM.put(eepromAddressDutyCycleA2, dutyCycleA2);
-  EEPROM.commit();  // Store the values in EEPROM
-  delay(10);
-}
-void saveDutyCycleB() {
-  EEPROM.put(eepromAddressDutyCycleB1, dutyCycleB1);
-  EEPROM.put(eepromAddressDutyCycleB2, dutyCycleB2);
-  EEPROM.commit();  // Store the values in EEPROM
-  delay(10);
-}
-void saveDutyCycleC() {
-  EEPROM.put(eepromAddressDutyCycleC1, dutyCycleC1);
-  EEPROM.put(eepromAddressDutyCycleC2, dutyCycleC2);
-  EEPROM.commit();  // Store the values in EEPROM
-  delay(10);
-}
-void saveDutyCycleD() {
-  EEPROM.put(eepromAddressDutyCycleD1, dutyCycleD1);
-  EEPROM.put(eepromAddressDutyCycleD2, dutyCycleD2);
-  EEPROM.commit();  // Store the values in EEPROM
-  delay(10);
-}
-void saveDutyCycleE() {
-  EEPROM.put(eepromAddressDutyCycleE1, dutyCycleE1);
-  EEPROM.put(eepromAddressDutyCycleE2, dutyCycleE2);
-  EEPROM.commit();  // Store the values in EEPROM
-  delay(10);
-}
-
 void setup() {
   Serial.begin(115200);  // Initialize serial communication
   SerialBT.begin(device_name);
@@ -641,7 +641,7 @@ void setup() {
 
 void loop() {
 
-  btdata = NULL;  //delete data of baluetooth variable in every loop
+  btdata = '\0';  //delete data of baluetooth variable in every loop
 
   if (SerialBT.available()) {
     btdata = SerialBT.read();
