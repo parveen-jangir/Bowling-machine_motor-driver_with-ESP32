@@ -8,6 +8,18 @@ Swing_Dec(IO15)   Mode(IO12)          L_Swing(IO26)  Speed_Dec(IO25)
 
  */
 
+// to initialize OTA
+#include <WiFi.h>
+#include <AsyncTCP.h>
+
+#include <ESPAsyncWebServer.h>
+#include <AsyncElegantOTA.h>
+
+const char* ssid = "ECB_TEQIP";
+const char* password = "";
+
+AsyncWebServer server(80);
+
 #include <Arduino.h>
 #include <EEPROM.h>
 #include <LiquidCrystal_I2C.h>
@@ -78,12 +90,6 @@ void update_FDisp()
 //.................Function for ball Feeder.........................//
 void ball_FSetting(bool setup_F)
 {
-  // if (setup_F == false)
-  // {
-  //   digitalWrite(In1, dir1);
-  //   digitalWrite(In2, dir2);
-  //   return;
-  // }
   while (setup_F)
   {
     if (digitalRead(Swing_Inc) == HIGH && ball_FMode != 'C')
@@ -107,11 +113,13 @@ void ball_FSetting(bool setup_F)
     {
       motor_F -= 15;
     }
-    if(digitalRead(ball_F) == HIGH){
+    if (digitalRead(ball_F) == HIGH)
+    {
       buzz(200);
       break;
     }
   }
+
   if (ball_FMode == 'A')
   {
     ball_FCMode = false;
@@ -121,7 +129,7 @@ void ball_FSetting(bool setup_F)
     digitalWrite(In2, dir2);
   }
   else if (ball_FMode == 'B')
-  { 
+  {
     ball_FCMode = false;
     dir1 = 0;
     dir2 = 1;
@@ -136,7 +144,31 @@ void ball_FSetting(bool setup_F)
 
 void setup()
 {
+  //..............command for Over the air.............//
   Serial.begin(115200);
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
+  Serial.println("");
+
+  // Wait for connection
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("");
+  Serial.print("Connected to ");
+  Serial.println(ssid);
+  Serial.print("IP address: ");
+  Serial.println(WiFi.localIP());
+
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest* request) {
+    request->send(200, "text/plain", "Hi! This is a sample response.");
+  });
+
+  AsyncElegantOTA.begin(&server);  // Start AsyncElegantOTA
+  server.begin();
+  Serial.println("HTTP server started");
+
   analogWrite(motor_F, 0);
   ball_FSetting(false);
 }
@@ -152,12 +184,13 @@ void loop()
     if (ball_FState == HIGH || btdata == 'p')
     {
       buzz(200);
-      if(analogRead(Motor3) != 0){
+      if (analogRead(Motor3) != 0)
+      {
         analogWrite(Motor3, 0);
       }
       else
         analogWrite(Motor3, motor_F);
-     
+
       lastDebounceTime = millis();
     }
   }
@@ -171,7 +204,18 @@ void loop()
     ball_FSetting(true);
   }
 
-  if(ball_FCMode && millis() - last_Ftime >= F_time){
-
+  if (ball_FCMode && millis() - last_Ftime >= F_time)
+  {
+    bool F_flag = NULL;
+    if (F_flag == true)
+    {
+    digitalWrite(In1, HIGH);
+    digitalWrite(In2, LOW);
+    F_flag = false;
+    }
+    else
+      digitalWrite(In1,LOW);
+      digitalWrite(In2, HIGH);
+      F_flag = true;
   }
 }
