@@ -1,63 +1,60 @@
 /*pannel button pattern and connected GPIO pins
 
-Swing_Inc(IO4)    Ball Feedeer(IO2)   R_Swing(IO14)  Speed_Inc(IO33)
+swSwing_Inc(IO4)    Ball Feedeer(IO2)   R_Swing(IO14)  Speed_Inc(IO33)
 
                   RST(IO13)           FWD(IO27)
 
-Swing_Dec(IO15)   Mode(IO12)          L_Swing(IO26)  Speed_Dec(IO25)
+swSwing_Dec(IO15)   Mode(IO12)          L_Swing(IO26)  swSpeed_Dec(IO25)
 
  */
-
-// to initialize OTA
-#include <WiFi.h>
-#include <AsyncTCP.h>
-
-#include <ESPAsyncWebServer.h>
-#include <AsyncElegantOTA.h>
-
-const char* ssid = "ECB_TEQIP";
-const char* password = "";
-
-AsyncWebServer server(80);
-
 #include <Arduino.h>
 #include <EEPROM.h>
 #include <LiquidCrystal_I2C.h>
 #include <BluetoothSerial.h>
+// #include <SoftwareSerial.h>
+
+LiquidCrystal_I2C lcd(0x3F, 16, 2); // set the LCD address to 0x3F for a 16 chars and 2 line display
 
 // bowl feeder connected pin to esp32
-const uint8_t Motor3 = 18;
-const uint8_t In1 = 5;
-const uint8_t In2 = 17;
+const uint8_t Motor_3 = 18;
+// const uint8_t Motor_1;
+// const uint8_t Motor_2;
+const uint8_t In_1 = 5;
+const uint8_t In_2 = 17;
 
 //***************GPIO Layout*************//
-const uint8_t Speed_Inc = 33;
-const uint8_t Speed_Dec = 25;
-const uint8_t R_swing = 14;
-const uint8_t L_swing = 26;
-const uint8_t Fwd = 27;
-const uint8_t Mode = 12;
-const uint8_t RST = 13;
-const uint8_t ball_F = 2;
-const uint8_t Swing_Inc = 4;
-const uint8_t Swing_Dec = 15;
+const uint8_t swSpeed_Inc = 33;
+const uint8_t swSpeed_Dec = 25;
+const uint8_t swR_swing = 14;
+const uint8_t swL_swing = 26;
+const uint8_t swFwd = 27;
+const uint8_t swMode = 12;
+const uint8_t swRST = 13;
+const uint8_t swball_F = 2;
+const uint8_t swSwing_Inc = 4;
+const uint8_t swSwing_Dec = 15;
 
 // RPM and direction of bowl Feeder
-uint8_t motor_F;
-bool dir1;
-bool dir2;
+uint8_t ball_F = 255;
+bool dir_1;
+bool dir_2;
+
+// present dutycycle of all three motors
+uint8_t duty_M1;
+uint8_t duty_M2;
+uint8_t duty_M3;
 
 // These are the states of bowl Feedeer push button
 bool ball_FState = HIGH;
 bool lastBall_FState = HIGH;
-char ball_FMode;
-bool ball_FCMode;
+char ball_FMode = 'A';
+bool ball_FCMode = false;
 unsigned long last_Ftime = 0;
 int F_time;
 
 //****** BLUETOOTH CODE **********
 
-String device_name = "ESP32 Sports AMI"; // ESP32_MOTOR_CONTROLLER
+String device_name = "ESP32 Pakhandi"; // ESP32_MOTOR_CONTROLLER
 
 #if !defined(CONFIG_BT_ENABLED) || !defined(CONFIG_BLUEDROID_ENABLED)
 #error Bluetooth is not enabled! Please run make menuconfig to and enable it
@@ -92,28 +89,28 @@ void ball_FSetting(bool setup_F)
 {
   while (setup_F)
   {
-    if (digitalRead(Swing_Inc) == HIGH && ball_FMode != 'C')
+    if (digitalRead(swSwing_Inc) == HIGH && ball_FMode != 'C')
     {
       buzz(200);
       ball_FMode += 1;
       update_FDisp();
     }
-    if (digitalRead(Swing_Dec) == HIGH && ball_FMode != 'A')
+    if (digitalRead(swSwing_Dec) == HIGH && ball_FMode != 'A')
     {
       buzz(200);
       ball_FMode -= 1;
       update_FDisp();
     }
 
-    if (digitalRead(Speed_Inc) == HIGH)
+    if (digitalRead(swSpeed_Inc) == HIGH)
     {
-      motor_F += 15;
+      ball_F += 15;
     }
-    if (digitalRead(Speed_Dec) == HIGH)
+    if (digitalRead(swSpeed_Dec) == HIGH)
     {
-      motor_F -= 15;
+      ball_F -= 15;
     }
-    if (digitalRead(ball_F) == HIGH)
+    if (digitalRead(swball_F) == HIGH)
     {
       buzz(200);
       break;
@@ -123,18 +120,18 @@ void ball_FSetting(bool setup_F)
   if (ball_FMode == 'A')
   {
     ball_FCMode = false;
-    dir1 = 1;
-    dir2 = 0;
-    digitalWrite(In1, dir1);
-    digitalWrite(In2, dir2);
+    dir_1 = 1;
+    dir_2 = 0;
+    digitalWrite(In_1, dir_1);
+    digitalWrite(In_2, dir_2);
   }
   else if (ball_FMode == 'B')
   {
     ball_FCMode = false;
-    dir1 = 0;
-    dir2 = 1;
-    digitalWrite(In1, dir1);
-    digitalWrite(In2, dir2);
+    dir_1 = 0;
+    dir_2 = 1;
+    digitalWrite(In_1, dir_1);
+    digitalWrite(In_2, dir_2);
   }
   else if (ball_FMode == 'C')
   {
@@ -144,38 +141,44 @@ void ball_FSetting(bool setup_F)
 
 void setup()
 {
-  //..............command for Over the air.............//
+  pinMode(Motor_3, OUTPUT);
+  pinMode(In_1, OUTPUT);
+  pinMode(In_2, OUTPUT);
+  pinMode(swSpeed_Dec, INPUT);
+  pinMode(swSpeed_Inc, INPUT);
+  pinMode(swSwing_Dec, INPUT);
+  pinMode(swSwing_Inc, INPUT);
+  pinMode(swball_F, INPUT);
+
   Serial.begin(115200);
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, password);
-  Serial.println("");
-
-  // Wait for connection
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("");
-  Serial.print("Connected to ");
-  Serial.println(ssid);
-  Serial.print("IP address: ");
-  Serial.println(WiFi.localIP());
-
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest* request) {
-    request->send(200, "text/plain", "Hi! This is a sample response.");
-  });
-
-  AsyncElegantOTA.begin(&server);  // Start AsyncElegantOTA
-  server.begin();
-  Serial.println("HTTP server started");
-
-  analogWrite(motor_F, 0);
+  SerialBT.begin(device_name);
+  analogWrite(Motor_3, ball_F);
+  duty_M3 = ball_F;
   ball_FSetting(false);
+  // inilialize LCD
+  lcd.init();
+  lcd.clear();
+  lcd.backlight();
+
+  // starting Display
+  lcd.setCursor(4, 0);
+  lcd.print("WELCOME");
+  lcd.setCursor(4, 1);
+  lcd.print("PLAYER!");
+  delay(2000);
 }
 
 void loop()
 {
-  ball_FState = digitalRead(ball_F);
+  delay(200);
+  btdata = '\0';
+  if (SerialBT.available())
+  {
+    btdata = SerialBT.read();
+    Serial.print(" Bluetooth input :- ");
+    Serial.println(btdata);
+  }
+  ball_FState = digitalRead(swball_F);
 
   if (ball_FState != lastBall_FState || btdata == 'p')
   {
@@ -184,38 +187,46 @@ void loop()
     if (ball_FState == HIGH || btdata == 'p')
     {
       buzz(200);
-      if (analogRead(Motor3) != 0)
+      if (duty_M3 != 0)
       {
-        analogWrite(Motor3, 0);
+        analogWrite(Motor_3, 0);
+        duty_M3 = 0;
+        Serial.println("H1");
       }
       else
-        analogWrite(Motor3, motor_F);
-
-      lastDebounceTime = millis();
+      {
+      analogWrite(Motor_3, ball_F);
+      duty_M3 = ball_F;
     }
+    lastDebounceTime = millis();
   }
-  if (ball_FState == HIGH && millis() - lastDebounceTime >= 3000)
+}
+if ((ball_FState == HIGH && millis() - lastDebounceTime >= 3000) || btdata == 'q')
+{
+  Serial.println("H2");
+  buzz(1000);
+  while (digitalRead(swball_F) == HIGH)
   {
-    buzz(1000);
-    while (digitalRead(ball_F) == HIGH)
-    {
-      delay(10);
-    }
-    ball_FSetting(true);
+    delay(10);
   }
+  ball_FSetting(true);
+}
 
-  if (ball_FCMode && millis() - last_Ftime >= F_time)
+if (ball_FCMode && millis() - last_Ftime >= F_time)
+{
+  Serial.println("H1");
+  bool F_flag = NULL;
+  if (F_flag == true)
   {
-    bool F_flag = NULL;
-    if (F_flag == true)
-    {
-    digitalWrite(In1, HIGH);
-    digitalWrite(In2, LOW);
+    Serial.println("H3");
+    digitalWrite(In_1, HIGH);
+    digitalWrite(In_2, LOW);
     F_flag = false;
-    }
-    else
-      digitalWrite(In1,LOW);
-      digitalWrite(In2, HIGH);
-      F_flag = true;
   }
+  else
+    digitalWrite(In_1, LOW);
+  Serial.println("H4");
+  digitalWrite(In_2, HIGH);
+  F_flag = true;
+}
 }
